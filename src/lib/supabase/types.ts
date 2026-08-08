@@ -1,7 +1,12 @@
-// Hand-written to match supabase/migrations/0001_init.sql. Once you have a
-// live Supabase project, regenerate the real thing with:
+// Hand-written to match supabase/migrations/*.sql. Once you have a live
+// Supabase project, regenerate the real thing with:
 //   npx supabase gen types typescript --project-id <your-project-id> > src/lib/supabase/types.ts
 // and this file's shape should end up identical (or very close) to what's here.
+//
+// `Relationships: []` on every table and `Views: {}` below aren't unused —
+// @supabase/postgrest-js's generic query types require them to be present
+// (GenericSchema) to resolve table row types at all; omitting them collapses
+// every query result to `never`.
 
 export interface Database {
   public: {
@@ -10,16 +15,19 @@ export interface Database {
         Row: { id: string; display_name: string; avatar_url: string | null; created_at: string };
         Insert: { id: string; display_name: string; avatar_url?: string | null };
         Update: { display_name?: string; avatar_url?: string | null };
+        Relationships: [];
       };
       families: {
-        Row: { id: string; name: string; created_by: string; created_at: string };
+        Row: { id: string; name: string; created_by: string; invite_code: string; created_at: string };
         Insert: { id?: string; name: string; created_by: string };
         Update: { name?: string };
+        Relationships: [];
       };
       family_members: {
         Row: { family_id: string; user_id: string; role: "owner" | "member"; joined_at: string };
         Insert: { family_id: string; user_id: string; role?: "owner" | "member" };
         Update: { role?: "owner" | "member" };
+        Relationships: [];
       };
       categories: {
         Row: {
@@ -40,6 +48,7 @@ export interface Database {
           kind: "income" | "expense";
         };
         Update: { name?: string; icon?: string | null; color?: string | null };
+        Relationships: [];
       };
       cards: {
         Row: {
@@ -68,6 +77,7 @@ export interface Database {
           credit_limit?: number | null;
         };
         Update: Partial<Database["public"]["Tables"]["cards"]["Insert"]>;
+        Relationships: [];
       };
       transactions: {
         Row: {
@@ -98,6 +108,7 @@ export interface Database {
           occurred_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["transactions"]["Insert"]>;
+        Relationships: [];
       };
       savings_goals: {
         Row: {
@@ -120,13 +131,16 @@ export interface Database {
           is_shared?: boolean;
         };
         Update: Partial<Database["public"]["Tables"]["savings_goals"]["Insert"]>;
+        Relationships: [];
       };
       savings_contributions: {
         Row: { id: string; goal_id: string; amount: number; occurred_at: string; note: string | null; created_at: string };
         Insert: { id?: string; goal_id: string; amount: number; occurred_at?: string; note?: string | null };
         Update: Partial<Database["public"]["Tables"]["savings_contributions"]["Insert"]>;
+        Relationships: [];
       };
     };
+    Views: Record<string, never>;
     Functions: {
       get_household_category_totals: {
         Args: { fam_id: string; from_date: string; to_date: string };
@@ -135,6 +149,14 @@ export interface Database {
       is_family_member: {
         Args: { fam_id: string };
         Returns: boolean;
+      };
+      join_family_by_code: {
+        Args: { code: string };
+        Returns: string;
+      };
+      create_family: {
+        Args: { family_name: string };
+        Returns: { id: string; name: string; invite_code: string }[];
       };
     };
   };

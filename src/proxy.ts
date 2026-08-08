@@ -5,7 +5,7 @@ const PUBLIC_PATHS = ["/login", "/signup", "/auth/callback"];
 
 /** Refreshes the Supabase session on every request (required by @supabase/ssr
  * for App Router) and redirects signed-out users to /login. */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(

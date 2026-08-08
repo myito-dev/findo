@@ -1,58 +1,93 @@
+import { CardFace } from "@/components/CardFace";
+import { AddCardForm } from "@/components/forms/AddCardForm";
+import { DeleteIconButton } from "@/components/forms/DeleteIconButton";
+import { NoFamilyPrompt } from "@/components/NoFamilyPrompt";
 import { Card } from "@/components/ui/Card";
-import { PlusIcon } from "@/components/icons";
-import { formatMXN } from "@/lib/format";
-import { mockCards } from "@/lib/mockData";
+import { currentCycleStart, toISODate } from "@/lib/cycles";
+import { daysUntil, formatMXN } from "@/lib/format";
+import { deleteCard } from "@/lib/actions";
+import { createClient } from "@/lib/supabase/server";
+import { getUserAndFamily } from "@/lib/supabase/family";
 
-function daysUntil(day: number | null): number | null {
-  if (day == null) return null;
-  const now = new Date();
-  const target = new Date(now.getFullYear(), now.getMonth(), day);
-  if (target < now) target.setMonth(target.getMonth() + 1);
-  return Math.round((target.getTime() - now.getTime()) / 86400000);
-}
+export default async function TarjetasPage() {
+  const supabase = await createClient();
+  const { user, familyId } = await getUserAndFamily(supabase);
 
-export default function TarjetasPage() {
+  if (!user) return null;
+
+  if (!familyId) {
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-5 sm:px-6 sm:py-8">
+        <h1 className="mb-4 text-2xl font-bold tracking-tight sm:text-3xl">Mis tarjetas</h1>
+        <NoFamilyPrompt />
+      </div>
+    );
+  }
+
+  const { data: cards } = await supabase.from("cards").select("*").eq("owner_id", user.id).order("created_at");
+  const cardList = cards ?? [];
+
+  const spentByCard = new Map<string, number>();
+  for (const card of cardList) {
+    const cycleStart = toISODate(currentCycleStart(card.cut_off_day));
+    const { data: txs } = await supabase
+      .from("transactions")
+      .select("amount")
+      .eq("card_id", card.id)
+      .eq("kind", "expense")
+      .gte("occurred_at", cycleStart);
+    spentByCard.set(
+      card.id,
+      (txs ?? []).reduce((s, t) => s + t.amount, 0)
+    );
+  }
+
+  const cashCycleStart = toISODate(currentCycleStart(null));
+  const { data: cashTxs } = await supabase
+    .from("transactions")
+    .select("amount")
+    .eq("owner_id", user.id)
+    .eq("kind", "expense")
+    .eq("payment_method", "efectivo")
+    .gte("occurred_at", cashCycleStart);
+  const cashSpent = (cashTxs ?? []).reduce((s, t) => s + t.amount, 0);
+
   return (
     <div className="mx-auto max-w-6xl space-y-6 px-4 py-5 sm:px-6 sm:py-8">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Mis tarjetas</h1>
-        <button type="button" className="pill flex items-center gap-1.5 bg-accent px-4 py-2 text-sm font-semibold text-accent-ink">
-          <PlusIcon className="h-4 w-4" />
-          Agregar
-        </button>
+        <AddCardForm />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {mockCards.map((card, i) => {
-          const cutOffIn = daysUntil(card.cutOffDay);
-          const paymentIn = daysUntil(card.paymentDueDay);
+        {cardList.map((card) => {
+          const cutOffIn = daysUntil(card.cut_off_day);
+          const paymentIn = daysUntil(card.payment_due_day);
           return (
             <div key={card.id} className="space-y-3">
-              {/* Card face — first card featured in lime, matching the reference's balance card. */}
-              <div className={`rounded-3xl p-5 ${i === 0 ? "bg-accent text-accent-ink" : "card"}`}>
-                <div className="mb-8 flex items-center justify-between">
-                  <span className={`text-xs ${i === 0 ? "text-accent-ink/70" : "text-ink-muted"}`}>
-                    {card.cardType === "credito" ? "Crédito" : "Débito"}
-                  </span>
-                  <span className="text-xs font-medium">•••• {card.last4}</span>
+              <div className="relative">
+                <CardFace
+                  name={card.name}
+                  cardType={card.card_type}
+                  last4={card.last4 ?? "----"}
+                  spentThisCycle={spentByCard.get(card.id) ?? 0}
+                />
+                <div className="absolute -right-2 -top-2">
+                  <DeleteIconButton action={deleteCard} id={card.id} label="Eliminar tarjeta" />
                 </div>
-                <p className={`text-xs ${i === 0 ? "text-accent-ink/70" : "text-ink-muted"}`}>Gastado este ciclo</p>
-                <p className="tabular text-2xl font-bold tracking-tight">{formatMXN(card.spentThisCycle)}</p>
-                <p className="mt-3 text-sm font-semibold">{card.name}</p>
               </div>
 
-              {/* Statement dates — only meaningful for crédito. */}
-              {card.cardType === "credito" ? (
+              {card.card_type === "credito" ? (
                 <Card className="!p-4">
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     <div>
                       <p className="text-xs text-ink-muted">Corte</p>
-                      <p className="font-semibold">Día {card.cutOffDay}</p>
+                      <p className="font-semibold">{card.cut_off_day ? `Día ${card.cut_off_day}` : "—"}</p>
                       {cutOffIn !== null && <p className="text-xs text-ink-muted">en {cutOffIn} días</p>}
                     </div>
                     <div>
                       <p className="text-xs text-ink-muted">Pago</p>
-                      <p className="font-semibold">Día {card.paymentDueDay}</p>
+                      <p className="font-semibold">{card.payment_due_day ? `Día ${card.payment_due_day}` : "—"}</p>
                       {paymentIn !== null && <p className="text-xs text-ink-muted">en {paymentIn} días</p>}
                     </div>
                   </div>
@@ -66,12 +101,17 @@ export default function TarjetasPage() {
           );
         })}
 
-        {/* Efectivo — not a real "card" row, but part of "¿en cuál tarjeta o en efectivo gasté?". */}
+        {cardList.length === 0 && (
+          <Card className="sm:col-span-2 lg:col-span-3">
+            <p className="text-sm text-ink-secondary">Todavía no agregas tarjetas. Usa &quot;Agregar&quot; arriba para empezar.</p>
+          </Card>
+        )}
+
         <div className="rounded-3xl border border-dashed border-hairline p-5">
           <p className="text-xs text-ink-muted">Método</p>
           <p className="mb-8 text-sm font-semibold">Efectivo</p>
           <p className="text-xs text-ink-muted">Gastado este ciclo</p>
-          <p className="tabular text-2xl font-bold tracking-tight">{formatMXN(0)}</p>
+          <p className="tabular text-2xl font-bold tracking-tight">{formatMXN(cashSpent)}</p>
         </div>
       </div>
     </div>

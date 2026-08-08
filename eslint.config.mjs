@@ -13,6 +13,12 @@ const eslintConfig = defineConfig([
     // Design-skill packages (npx skills add), if installed into this project — not app code.
     ".agents/**",
     ".claude/**",
+    // bklit chart system, vendored from garmin-coach — vendor code we consume, not
+    // author; our own wrapper charts (CashflowChart.tsx) stay PascalCase and are
+    // still linted.
+    "src/components/charts/[a-z]*.{ts,tsx}",
+    "src/components/charts/tooltip/**",
+    "src/components/shimmering-text.tsx",
   ]),
 ]);
 

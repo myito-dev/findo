@@ -1,49 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  color-scheme: light;
-  /* Elevation scale, light mode — derived (no light-mode reference was
-     provided yet; dark mode below uses your exact hex values). */
-  --page: #f7f7f5;
-  --surface: #ffffff;
-  --surface-raised: #f2f2ef;
-  --ink: #0a0a0a;
-  --ink-secondary: #52514e;
-  --ink-muted: #8a8a86;
-  --hairline: #e5e5e1;
-  --border: rgba(10, 10, 10, 0.08);
-
-  /* Brand — from your reference (Colours panel). */
-  --accent: #d7ff67;
-  --accent-ink: #0a0a0a;
-  --positive: #6fae1f;
-  --negative: #e4483f;
-
-  --shadow-color: 220 20% 20%;
-  --radius-card: 1.75rem;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    color-scheme: dark;
-    --page: #0a0a0a;
-    --surface: #161616;
-    --surface-raised: #212121;
-    --ink: #fcfcfc;
-    --ink-secondary: #b5b5b0;
-    --ink-muted: #7a7a76;
-    --hairline: rgba(255, 255, 255, 0.08);
-    --border: rgba(255, 255, 255, 0.1);
-
-    --accent: #d7ff67;
-    --accent-ink: #0a0a0a;
-    --positive: #d7ff67;
-    --negative: #ff6b6b;
-  }
-}
-
-:root[data-theme="dark"] {
   color-scheme: dark;
+  /* Findo is dark-only — no light theme. Exact hex values from your reference. */
   --page: #0a0a0a;
   --surface: #161616;
   --surface-raised: #212121;
@@ -53,10 +12,43 @@
   --hairline: rgba(255, 255, 255, 0.08);
   --border: rgba(255, 255, 255, 0.1);
 
+  /* Brand — from your reference (Colours panel). */
   --accent: #d7ff67;
   --accent-ink: #0a0a0a;
   --positive: #d7ff67;
   --negative: #ff6b6b;
+
+  --shadow-color: 220 20% 20%;
+  --radius-card: 1.75rem;
+
+  /* Chart tokens (bklit chart system) — single-accent palette matching the
+     reference's "one lime highlight bar, rest muted" pattern. */
+  --chart-1: var(--accent);
+  --chart-2: var(--ink-muted);
+  --chart-3: #8a8a86;
+  --chart-4: #b5b5b0;
+  --chart-5: #d95926;
+  --chart-background: var(--surface-raised);
+  --chart-foreground: var(--ink);
+  --chart-foreground-muted: var(--ink-secondary);
+  --chart-line-primary: var(--accent);
+  --chart-line-secondary: var(--chart-2);
+  --chart-crosshair: var(--accent);
+  --chart-grid: var(--hairline);
+  --chart-brush-border: var(--hairline);
+  --chart-tooltip-background: var(--surface);
+  --chart-tooltip-foreground: var(--ink);
+  --chart-tooltip-muted: var(--ink-muted);
+  --chart-marker-background: var(--surface);
+  --chart-marker-border: var(--hairline);
+  --chart-marker-foreground: var(--ink);
+  --chart-label: var(--ink-muted);
+  --chart-scale-01: #6fae1f;
+  --chart-scale-02: #94c94a;
+  --chart-scale-03: #b8e187;
+  --chart-scale-04: #d7ff67;
+  --chart-scale-05: #eaffb3;
+  --chart-scale-pattern-color: var(--hairline);
 }
 
 @theme inline {
@@ -76,6 +68,33 @@
   --radius-2xl: 1.25rem;
   --radius-3xl: var(--radius-card);
   --radius-4xl: 2rem;
+
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-chart-scale-pattern-color: var(--chart-scale-pattern-color);
+  --color-chart-scale-05: var(--chart-scale-05);
+  --color-chart-scale-04: var(--chart-scale-04);
+  --color-chart-scale-03: var(--chart-scale-03);
+  --color-chart-scale-02: var(--chart-scale-02);
+  --color-chart-scale-01: var(--chart-scale-01);
+  --color-chart-label: var(--chart-label);
+  --color-chart-marker-foreground: var(--chart-marker-foreground);
+  --color-chart-marker-border: var(--chart-marker-border);
+  --color-chart-marker-background: var(--chart-marker-background);
+  --color-chart-tooltip-muted: var(--chart-tooltip-muted);
+  --color-chart-tooltip-foreground: var(--chart-tooltip-foreground);
+  --color-chart-tooltip-background: var(--chart-tooltip-background);
+  --chart-brush-border: var(--chart-brush-border);
+  --color-chart-grid: var(--chart-grid);
+  --color-chart-crosshair: var(--chart-crosshair);
+  --chart-line-secondary: var(--chart-line-secondary);
+  --chart-line-primary: var(--chart-line-primary);
+  --color-chart-foreground-muted: var(--chart-foreground-muted);
+  --color-chart-foreground: var(--chart-foreground);
+  --color-chart-background: var(--chart-background);
 }
 
 * {
@@ -87,11 +106,27 @@ html {
 }
 
 body {
+  position: relative;
   background: var(--page);
   color: var(--ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+/* Soft color blobs behind the glass surfaces — without these, backdrop-blur
+   on a flat black page has nothing to diffuse and just looks like a plain
+   dark panel. Fixed so they stay put as content scrolls underneath. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(720px 520px at 8% -8%, color-mix(in oklab, var(--accent) 22%, transparent), transparent 60%),
+    radial-gradient(640px 480px at 100% 8%, color-mix(in oklab, #6a5cff 18%, transparent), transparent 60%),
+    radial-gradient(680px 560px at 20% 100%, color-mix(in oklab, #ff6b9d 12%, transparent), transparent 65%);
 }
 
 ::selection {
@@ -112,13 +147,31 @@ body {
   background-clip: padding-box;
 }
 
-/* Standard card surface — large radius, hairline border, matches the
-   reference's rounded dark panels. */
+/* Standard card surface — translucent + blurred (liquid glass), large
+   radius, hairline border. Needs the color blobs on body::before behind it
+   to actually read as glass rather than plain dark panels. */
 .card {
-  background: var(--surface-raised);
-  border: 1px solid var(--border);
+  background: color-mix(in oklab, var(--surface-raised) 62%, transparent);
+  backdrop-filter: blur(28px) saturate(150%);
+  -webkit-backdrop-filter: blur(28px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: var(--radius-card);
   box-shadow: 0 1px 2px hsl(var(--shadow-color) / 0.04), 0 8px 24px -12px hsl(var(--shadow-color) / 0.12);
+}
+
+/* Nav bars / floating bottom nav — same glass treatment, slightly lighter
+   blur since they're thin bars, not big panels. */
+.glass {
+  background: color-mix(in oklab, var(--page) 55%, transparent);
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+}
+
+.glass-pill {
+  background: color-mix(in oklab, var(--surface) 55%, transparent);
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 /* The one "featured" card treatment from the reference (Expense Breakdown,
