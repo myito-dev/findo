@@ -1,11 +1,9 @@
-import { CardFace } from "@/components/CardFace";
 import { AddCardForm } from "@/components/forms/AddCardForm";
-import { DeleteIconButton } from "@/components/forms/DeleteIconButton";
+import { EditCardTile } from "@/components/forms/EditCardTile";
 import { NoFamilyPrompt } from "@/components/NoFamilyPrompt";
 import { Card } from "@/components/ui/Card";
 import { currentCycleStart, toISODate } from "@/lib/cycles";
 import { daysUntil, formatMXN } from "@/lib/format";
-import { deleteCard } from "@/lib/actions";
 import { createClient } from "@/lib/supabase/server";
 import { getUserAndFamily } from "@/lib/supabase/family";
 
@@ -65,17 +63,7 @@ export default async function TarjetasPage() {
           const paymentIn = daysUntil(card.payment_due_day);
           return (
             <div key={card.id} className="space-y-3">
-              <div className="relative">
-                <CardFace
-                  name={card.name}
-                  cardType={card.card_type}
-                  last4={card.last4 ?? "----"}
-                  spentThisCycle={spentByCard.get(card.id) ?? 0}
-                />
-                <div className="absolute -right-2 -top-2">
-                  <DeleteIconButton action={deleteCard} id={card.id} label="Eliminar tarjeta" />
-                </div>
-              </div>
+              <EditCardTile card={card} spentThisCycle={spentByCard.get(card.id) ?? 0} />
 
               {card.card_type === "credito" ? (
                 <Card className="!p-4">

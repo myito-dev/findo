@@ -1,9 +1,7 @@
 import { AddTransactionForm } from "@/components/forms/AddTransactionForm";
-import { DeleteIconButton } from "@/components/forms/DeleteIconButton";
+import { TransactionRow } from "@/components/forms/TransactionRow";
 import { NoFamilyPrompt } from "@/components/NoFamilyPrompt";
 import { Card } from "@/components/ui/Card";
-import { deleteTransaction } from "@/lib/actions";
-import { formatDateShort, formatMXN } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import { getUserAndFamily } from "@/lib/supabase/family";
 
@@ -25,7 +23,7 @@ export default async function MovimientosPage() {
   const [{ data: transactions }, { data: categories }, { data: cards }] = await Promise.all([
     supabase
       .from("transactions")
-      .select("id, amount, kind, description, occurred_at, category_id")
+      .select("id, amount, kind, description, occurred_at, category_id, payment_method, card_id, is_shared")
       .eq("owner_id", user.id)
       .order("occurred_at", { ascending: false })
       .limit(100),
@@ -34,13 +32,15 @@ export default async function MovimientosPage() {
   ]);
 
   const txList = transactions ?? [];
-  const categoryNameById = new Map((categories ?? []).map((c) => [c.id, c.name]));
+  const categoryList = categories ?? [];
+  const cardList = cards ?? [];
+  const categoryNameById = new Map(categoryList.map((c) => [c.id, c.name]));
 
   return (
     <div className="mx-auto max-w-2xl space-y-4 px-4 py-5 sm:px-6 sm:py-8">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Movimientos</h1>
-        <AddTransactionForm categories={categories ?? []} cards={cards ?? []} />
+        <AddTransactionForm categories={categoryList} cards={cardList} />
       </div>
 
       <Card>
@@ -49,20 +49,13 @@ export default async function MovimientosPage() {
         ) : (
           <div className="space-y-3">
             {txList.map((t) => (
-              <div key={t.id} className="flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">
-                    {t.description || (t.category_id && categoryNameById.get(t.category_id)) || "Movimiento"}
-                  </p>
-                  <p className="text-xs text-ink-muted">{formatDateShort(t.occurred_at)}</p>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <span className={`tabular text-sm font-semibold ${t.kind === "income" ? "text-positive" : "text-ink"}`}>
-                    {formatMXN(t.amount, { showSign: t.kind === "income" })}
-                  </span>
-                  <DeleteIconButton action={deleteTransaction} id={t.id} label="Eliminar movimiento" />
-                </div>
-              </div>
+              <TransactionRow
+                key={t.id}
+                transaction={t}
+                fallbackLabel={(t.category_id && categoryNameById.get(t.category_id)) || "Movimiento"}
+                categories={categoryList}
+                cards={cardList}
+              />
             ))}
           </div>
         )}

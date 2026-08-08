@@ -22,6 +22,7 @@ export interface CashflowWeek {
 export function CashflowChart({ data }: { data: CashflowWeek[] }) {
   const { ref, inView } = useInViewOnce<HTMLDivElement>();
   const isMobile = useIsMobile();
+  const maxLabels = Math.min(data.length, isMobile ? 5 : 9);
 
   return (
     <div ref={ref}>
@@ -34,7 +35,7 @@ export function CashflowChart({ data }: { data: CashflowWeek[] }) {
       >
         <Grid horizontal strokeDasharray="4,4" />
         <Bar dataKey="expense" fill="var(--accent)" />
-        <BarXAxis maxLabels={isMobile ? 4 : 4} />
+        <BarXAxis maxLabels={maxLabels} />
         <BarValueAxis format={(v) => formatMXN(v)} />
         <ChartTooltip
           rows={(point) => [{ color: "var(--accent)", label: "Gasto", value: formatMXN(Number(point.expense)) }]}

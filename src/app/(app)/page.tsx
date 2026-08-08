@@ -1,29 +1,27 @@
 import { BalanceChips } from "@/components/BalanceChips";
 import { MotionLink } from "@/components/MotionLink";
 import { NoFamilyPrompt } from "@/components/NoFamilyPrompt";
+import { PeriodSelector } from "@/components/PeriodSelector";
 import { Card } from "@/components/ui/Card";
 import { CashflowChart } from "@/components/CashflowChart";
 import { CategorySummary } from "@/components/CategorySummary";
 import { ArrowUpRightIcon, UsersIcon } from "@/components/icons";
 import { cn } from "@/lib/utils";
+import { buildCashflowBuckets, cashflowRangeStart, type CashflowPeriod } from "@/lib/cashflowBuckets";
 import { formatDateShort, formatMXN } from "@/lib/format";
 import { forecastNextExpense } from "@/lib/predictions";
 import { createClient } from "@/lib/supabase/server";
 import { getUserAndFamily } from "@/lib/supabase/family";
+
+const CASHFLOW_PERIODS: CashflowPeriod[] = ["semana", "quincena", "mes", "3meses", "ano"];
 
 function startOfMonthISO(): string {
   const now = new Date();
   return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
 }
 
-/** Monday-anchored start of the week containing `d`. */
-function startOfWeek(d: Date): Date {
-  const day = d.getDay();
-  const diff = (day === 0 ? -6 : 1) - day;
-  const monday = new Date(d);
-  monday.setDate(d.getDate() + diff);
-  monday.setHours(0, 0, 0, 0);
-  return monday;
+function toISODate(d: Date): string {
+  return d.toISOString().slice(0, 10);
 }
 
 function DashboardTabs({ active }: { active: "personal" | "familia" }) {
@@ -47,9 +45,10 @@ function DashboardTabs({ active }: { active: "personal" | "familia" }) {
   );
 }
 
-export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
-  const { view } = await searchParams;
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ view?: string; period?: string }> }) {
+  const { view, period: periodParam } = await searchParams;
   const isFamily = view === "familia";
+  const period: CashflowPeriod = CASHFLOW_PERIODS.includes(periodParam as CashflowPeriod) ? (periodParam as CashflowPeriod) : "mes";
 
   const supabase = await createClient();
   const { user, familyId } = await getUserAndFamily(supabase);
@@ -169,18 +168,22 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     );
   }
 
-  const [{ data: cards }, { data: monthTxs }, { data: recentTxs }, { data: categories }, { data: goals }] = await Promise.all([
-    supabase.from("cards").select("id, name, last4").eq("owner_id", user.id).order("created_at"),
-    supabase.from("transactions").select("amount, kind, payment_method, category_id, occurred_at, card_id").eq("owner_id", user.id).gte("occurred_at", monthStart),
-    supabase
-      .from("transactions")
-      .select("id, amount, kind, description, occurred_at, category_id")
-      .eq("owner_id", user.id)
-      .order("occurred_at", { ascending: false })
-      .limit(5),
-    supabase.from("categories").select("id, name").eq("family_id", familyId),
-    supabase.from("savings_goals").select("id").eq("owner_id", user.id),
-  ]);
+  const cashflowStart = toISODate(cashflowRangeStart(period));
+
+  const [{ data: cards }, { data: monthTxs }, { data: cashflowTxs }, { data: recentTxs }, { data: categories }, { data: goals }] =
+    await Promise.all([
+      supabase.from("cards").select("id, name, last4").eq("owner_id", user.id).order("created_at"),
+      supabase.from("transactions").select("amount, kind, payment_method, category_id, occurred_at, card_id").eq("owner_id", user.id).gte("occurred_at", monthStart),
+      supabase.from("transactions").select("occurred_at, kind, amount").eq("owner_id", user.id).gte("occurred_at", cashflowStart),
+      supabase
+        .from("transactions")
+        .select("id, amount, kind, description, occurred_at, category_id")
+        .eq("owner_id", user.id)
+        .order("occurred_at", { ascending: false })
+        .limit(5),
+      supabase.from("categories").select("id, name").eq("family_id", familyId),
+      supabase.from("savings_goals").select("id").eq("owner_id", user.id),
+    ]);
 
   // Balances (rough MVP model — no stored account balances, derived from transactions).
   const monthList = monthTxs ?? [];
@@ -197,21 +200,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   }
   const total = efectivo + tarjetas + ahorros;
 
-  // Cashflow — last 4 Monday-anchored weeks, oldest first.
-  const now = new Date();
-  const weekStarts = Array.from({ length: 4 }, (_, i) => {
-    const d = new Date(startOfWeek(now));
-    d.setDate(d.getDate() - (3 - i) * 7);
-    return d;
-  });
-  const cashflow = weekStarts.map((weekStart, i) => {
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekEnd.getDate() + 7);
-    const expense = monthList
-      .filter((t) => t.kind === "expense" && new Date(t.occurred_at) >= weekStart && new Date(t.occurred_at) < weekEnd)
-      .reduce((s, t) => s + t.amount, 0);
-    return { label: `Sem ${i + 1}`, income: 0, expense, saving: 0 };
-  });
+  const cashflow = buildCashflowBuckets(period, cashflowTxs ?? []);
   const forecast = forecastNextExpense(cashflow.map((w) => w.expense));
 
   // Category breakdown (this month, expenses only).
@@ -292,14 +281,17 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
       <div className="grid gap-4 sm:grid-cols-3 sm:gap-6">
         <Card className="sm:col-span-2">
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex items-center justify-between gap-2">
             <div>
-              <span className="text-sm text-ink-muted">Flujo de efectivo</span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-ink-muted">Flujo de efectivo</span>
+                <PeriodSelector current={period} />
+              </div>
               <p className="tabular text-2xl font-bold tracking-tight">{formatMXN(cashflow.reduce((s, w) => s + w.expense, 0))}</p>
             </div>
             {forecast && (
               <div className="pill bg-surface px-3 py-1.5 text-right">
-                <p className="text-[10px] text-ink-muted">Próxima semana (predicción)</p>
+                <p className="text-[10px] text-ink-muted">Predicción</p>
                 <p className="tabular text-xs font-semibold">
                   {formatMXN(forecast.nextValue)}{" "}
                   <span className={forecast.trend === "up" ? "text-negative" : forecast.trend === "down" ? "text-positive" : "text-ink-muted"}>

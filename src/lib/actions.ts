@@ -37,6 +37,27 @@ export async function addCard(formData: FormData) {
   revalidatePath("/");
 }
 
+export async function updateCard(cardId: string, formData: FormData) {
+  const supabase = await createClient();
+  const cardType = str(formData, "cardType");
+  const cutOffDay = optionalStr(formData, "cutOffDay");
+  const paymentDueDay = optionalStr(formData, "paymentDueDay");
+
+  await supabase
+    .from("cards")
+    .update({
+      name: str(formData, "name"),
+      card_type: cardType === "debito" ? "debito" : "credito",
+      last4: optionalStr(formData, "last4"),
+      cut_off_day: cardType === "credito" && cutOffDay ? Number(cutOffDay) : null,
+      payment_due_day: cardType === "credito" && paymentDueDay ? Number(paymentDueDay) : null,
+    })
+    .eq("id", cardId);
+
+  revalidatePath("/tarjetas");
+  revalidatePath("/");
+}
+
 export async function deleteCard(cardId: string) {
   const supabase = await createClient();
   await supabase.from("cards").delete().eq("id", cardId);
@@ -63,6 +84,29 @@ export async function addTransaction(formData: FormData) {
     is_shared: formData.get("isShared") === "on",
     occurred_at: optionalStr(formData, "occurredAt") ?? undefined,
   });
+
+  revalidatePath("/movimientos");
+  revalidatePath("/tarjetas");
+  revalidatePath("/");
+}
+
+export async function updateTransaction(transactionId: string, formData: FormData) {
+  const supabase = await createClient();
+  const paymentMethod = str(formData, "paymentMethod");
+
+  await supabase
+    .from("transactions")
+    .update({
+      kind: str(formData, "kind") === "income" ? "income" : "expense",
+      amount: Number(str(formData, "amount")),
+      category_id: optionalStr(formData, "categoryId"),
+      card_id: paymentMethod === "tarjeta" ? optionalStr(formData, "cardId") : null,
+      payment_method: paymentMethod === "tarjeta" ? "tarjeta" : "efectivo",
+      description: optionalStr(formData, "description"),
+      is_shared: formData.get("isShared") === "on",
+      occurred_at: optionalStr(formData, "occurredAt") ?? undefined,
+    })
+    .eq("id", transactionId);
 
   revalidatePath("/movimientos");
   revalidatePath("/tarjetas");

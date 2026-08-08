@@ -1,13 +1,13 @@
 "use client";
 
-import { AnimatePresence, motion } from "motion/react";
+import { motion } from "motion/react";
 import { useState, type ReactNode } from "react";
-import { PlusIcon, XIcon } from "../icons";
-import { springSnappy, tapScaleSmall } from "@/lib/motion";
+import { Modal } from "./Modal";
+import { PlusIcon } from "../icons";
+import { tapScaleSmall } from "@/lib/motion";
 
 /** Shared "+ Agregar" trigger + centered modal — used for cards, movimientos
- * and metas de ahorro. A modal (not an inline-expanding panel) so opening it
- * never pushes or misaligns the page header next to the trigger button. */
+ * and metas de ahorro. */
 export function AddPanel({ label, title, children }: { label: string; title: string; children: (close: () => void) => ReactNode }) {
   const [open, setOpen] = useState(false);
 
@@ -23,41 +23,9 @@ export function AddPanel({ label, title, children }: { label: string; title: str
         {label}
       </motion.button>
 
-      <AnimatePresence>
-        {open && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setOpen(false)}
-              className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
-            />
-            <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4">
-              <motion.div
-                initial={{ opacity: 0, y: 16, scale: 0.97 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 16, scale: 0.97 }}
-                transition={springSnappy}
-                className="card pointer-events-auto max-h-[85vh] w-full max-w-md overflow-y-auto p-5"
-              >
-                <div className="mb-4 flex items-center justify-between">
-                  <p className="text-base font-semibold">{title}</p>
-                  <button
-                    type="button"
-                    onClick={() => setOpen(false)}
-                    aria-label="Cerrar"
-                    className="flex h-7 w-7 items-center justify-center rounded-full bg-surface text-ink-muted"
-                  >
-                    <XIcon className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-                {children(() => setOpen(false))}
-              </motion.div>
-            </div>
-          </>
-        )}
-      </AnimatePresence>
+      <Modal open={open} onClose={() => setOpen(false)} title={title}>
+        {children(() => setOpen(false))}
+      </Modal>
     </>
   );
 }
