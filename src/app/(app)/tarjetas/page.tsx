@@ -25,30 +25,34 @@ export default async function TarjetasPage() {
   const { data: cards } = await supabase.from("cards").select("*").eq("owner_id", user.id).order("created_at");
   const cardList = cards ?? [];
 
-  const spentByCard = new Map<string, number>();
+  // Crédito: "Gastado este ciclo" — expense only, scoped to the statement
+  // cycle (matches how a credit card actually works, it's debt not a balance).
+  // Débito: "Tienes" — a real net balance (income minus expense, all time),
+  // same idea as cash.
+  const cardAmounts = new Map<string, { label: string; amount: number }>();
   for (const card of cardList) {
-    const cycleStart = toISODate(currentCycleStart(card.cut_off_day));
-    const { data: txs } = await supabase
-      .from("transactions")
-      .select("amount")
-      .eq("card_id", card.id)
-      .eq("kind", "expense")
-      .gte("occurred_at", cycleStart);
-    spentByCard.set(
-      card.id,
-      (txs ?? []).reduce((s, t) => s + t.amount, 0)
-    );
+    if (card.card_type === "credito") {
+      const cycleStart = toISODate(currentCycleStart(card.cut_off_day));
+      const { data: txs } = await supabase
+        .from("transactions")
+        .select("amount")
+        .eq("card_id", card.id)
+        .eq("kind", "expense")
+        .gte("occurred_at", cycleStart);
+      cardAmounts.set(card.id, { label: "Gastado este ciclo", amount: (txs ?? []).reduce((s, t) => s + t.amount, 0) });
+    } else {
+      const { data: txs } = await supabase.from("transactions").select("amount, kind").eq("card_id", card.id);
+      const balance = (txs ?? []).reduce((s, t) => s + (t.kind === "income" ? t.amount : -t.amount), 0);
+      cardAmounts.set(card.id, { label: "Tienes", amount: balance });
+    }
   }
 
-  const cashCycleStart = toISODate(currentCycleStart(null));
   const { data: cashTxs } = await supabase
     .from("transactions")
-    .select("amount")
+    .select("amount, kind")
     .eq("owner_id", user.id)
-    .eq("kind", "expense")
-    .eq("payment_method", "efectivo")
-    .gte("occurred_at", cashCycleStart);
-  const cashSpent = (cashTxs ?? []).reduce((s, t) => s + t.amount, 0);
+    .eq("payment_method", "efectivo");
+  const cashBalance = (cashTxs ?? []).reduce((s, t) => s + (t.kind === "income" ? t.amount : -t.amount), 0);
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 px-4 py-5 sm:px-6 sm:py-8">
@@ -63,7 +67,11 @@ export default async function TarjetasPage() {
           const paymentIn = daysUntil(card.payment_due_day);
           return (
             <div key={card.id} className="space-y-3">
-              <EditCardTile card={card} spentThisCycle={spentByCard.get(card.id) ?? 0} />
+              <EditCardTile
+                card={card}
+                amountLabel={cardAmounts.get(card.id)?.label ?? "Gastado este ciclo"}
+                amount={cardAmounts.get(card.id)?.amount ?? 0}
+              />
 
               {card.card_type === "credito" ? (
                 <Card className="!p-4">
@@ -98,8 +106,8 @@ export default async function TarjetasPage() {
         <div className="rounded-3xl border border-dashed border-hairline p-5">
           <p className="text-xs text-ink-muted">Método</p>
           <p className="mb-8 text-sm font-semibold">Efectivo</p>
-          <p className="text-xs text-ink-muted">Gastado este ciclo</p>
-          <p className="tabular text-2xl font-bold tracking-tight">{formatMXN(cashSpent)}</p>
+          <p className="text-xs text-ink-muted">Tienes</p>
+          <p className="tabular text-2xl font-bold tracking-tight">{formatMXN(cashBalance)}</p>
         </div>
       </div>
     </div>

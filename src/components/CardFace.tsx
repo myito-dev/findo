@@ -10,12 +10,16 @@ export function CardFace({
   name,
   cardType,
   last4,
-  spentThisCycle,
+  amountLabel,
+  amount,
 }: {
   name: string;
   cardType: "credito" | "debito";
   last4: string;
-  spentThisCycle: number;
+  /** "Gastado este ciclo" for crédito, "Tienes" (net balance) for débito —
+   * the caller decides since only it knows which figure was computed. */
+  amountLabel: string;
+  amount: number;
 }) {
   const brand = detectBankBrand(name);
   const network = detectNetwork(name);
@@ -30,8 +34,8 @@ export function CardFace({
         <span className={cn("text-xs", muted)}>{cardType === "credito" ? "Crédito" : "Débito"}</span>
         <span className="text-xs font-medium">•••• {last4}</span>
       </div>
-      <p className={cn("text-xs", muted)}>Gastado este ciclo</p>
-      <p className="tabular text-2xl font-bold tracking-tight">{formatMXN(spentThisCycle)}</p>
+      <p className={cn("text-xs", muted)}>{amountLabel}</p>
+      <p className="tabular text-2xl font-bold tracking-tight">{formatMXN(amount)}</p>
       <div className="mt-3 flex items-end justify-between gap-2">
         <p className="truncate text-sm font-semibold">{name}</p>
         {network && <CardNetworkMark network={network} className="shrink-0" />}

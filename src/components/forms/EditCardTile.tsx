@@ -20,7 +20,15 @@ interface CardData {
 
 /** A tarjeta face that opens an edit modal on click, pre-filled with its
  * current data, plus a delete option — same pattern as TransactionRow. */
-export function EditCardTile({ card, spentThisCycle }: { card: CardData; spentThisCycle: number }) {
+export function EditCardTile({
+  card,
+  amountLabel,
+  amount,
+}: {
+  card: CardData;
+  amountLabel: string;
+  amount: number;
+}) {
   const [open, setOpen] = useState(false);
   const [cardType, setCardType] = useState<"credito" | "debito">(card.card_type);
   const [pending, startTransition] = useTransition();
@@ -29,7 +37,7 @@ export function EditCardTile({ card, spentThisCycle }: { card: CardData; spentTh
   return (
     <>
       <button type="button" onClick={() => setOpen(true)} className="block w-full text-left">
-        <CardFace name={card.name} cardType={card.card_type} last4={card.last4 ?? "----"} spentThisCycle={spentThisCycle} />
+        <CardFace name={card.name} cardType={card.card_type} last4={card.last4 ?? "----"} amountLabel={amountLabel} amount={amount} />
       </button>
 
       <Modal open={open} onClose={() => setOpen(false)} title="Editar tarjeta">

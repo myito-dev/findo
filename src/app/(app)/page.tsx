@@ -186,11 +186,15 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     ]);
 
   // Balances (rough MVP model — no stored account balances, derived from transactions).
+  // Efectivo and Tarjetas both net income minus expense for their payment
+  // method, so no transaction — income included — silently falls out of the total.
   const monthList = monthTxs ?? [];
   const efectivo = monthList
     .filter((t) => t.payment_method === "efectivo")
     .reduce((s, t) => s + (t.kind === "income" ? t.amount : -t.amount), 0);
-  const tarjetas = monthList.filter((t) => t.payment_method === "tarjeta" && t.kind === "expense").reduce((s, t) => s + t.amount, 0);
+  const tarjetas = monthList
+    .filter((t) => t.payment_method === "tarjeta")
+    .reduce((s, t) => s + (t.kind === "income" ? t.amount : -t.amount), 0);
 
   const goalIds = (goals ?? []).map((g) => g.id);
   let ahorros = 0;
