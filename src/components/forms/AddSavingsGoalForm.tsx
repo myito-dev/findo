@@ -9,7 +9,11 @@ import { tapScaleSmall } from "@/lib/motion";
 const inputClass = "w-full rounded-2xl border border-hairline bg-surface px-4 py-2.5 text-sm outline-none";
 
 export function AddSavingsGoalForm() {
-  return <AddPanel label="Nueva meta">{(close) => <GoalFields close={close} />}</AddPanel>;
+  return (
+    <AddPanel label="Nueva meta" title="Nueva meta de ahorro">
+      {(close) => <GoalFields close={close} />}
+    </AddPanel>
+  );
 }
 
 function GoalFields({ close }: { close: () => void }) {

@@ -144,7 +144,7 @@ export interface Database {
     Functions: {
       get_household_category_totals: {
         Args: { fam_id: string; from_date: string; to_date: string };
-        Returns: { category_id: string; category_name: string; kind: "income" | "expense"; total: number }[];
+        Returns: { category_id: string | null; category_name: string | null; kind: "income" | "expense"; total: number }[];
       };
       is_family_member: {
         Args: { fam_id: string };

@@ -4,7 +4,8 @@ import { NoFamilyPrompt } from "@/components/NoFamilyPrompt";
 import { Card } from "@/components/ui/Card";
 import { CashflowChart } from "@/components/CashflowChart";
 import { CategorySummary } from "@/components/CategorySummary";
-import { ArrowUpRightIcon } from "@/components/icons";
+import { ArrowUpRightIcon, UsersIcon } from "@/components/icons";
+import { cn } from "@/lib/utils";
 import { formatDateShort, formatMXN } from "@/lib/format";
 import { forecastNextExpense } from "@/lib/predictions";
 import { createClient } from "@/lib/supabase/server";
@@ -25,7 +26,31 @@ function startOfWeek(d: Date): Date {
   return monday;
 }
 
-export default async function DashboardPage() {
+function DashboardTabs({ active }: { active: "personal" | "familia" }) {
+  return (
+    <div className="glass-pill inline-flex items-center gap-1 rounded-full p-1">
+      <MotionLink
+        href="/"
+        whileTap={{ scale: 0.96 }}
+        className={cn("rounded-full px-4 py-1.5 text-sm font-medium", active === "personal" ? "bg-accent text-accent-ink" : "text-ink-secondary")}
+      >
+        Personal
+      </MotionLink>
+      <MotionLink
+        href="/?view=familia"
+        whileTap={{ scale: 0.96 }}
+        className={cn("rounded-full px-4 py-1.5 text-sm font-medium", active === "familia" ? "bg-accent text-accent-ink" : "text-ink-secondary")}
+      >
+        Familia
+      </MotionLink>
+    </div>
+  );
+}
+
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
+  const { view } = await searchParams;
+  const isFamily = view === "familia";
+
   const supabase = await createClient();
   const { user, familyId } = await getUserAndFamily(supabase);
 
@@ -44,6 +69,105 @@ export default async function DashboardPage() {
   }
 
   const monthStart = startOfMonthISO();
+  const today = new Date().toISOString().slice(0, 10);
+
+  if (isFamily) {
+    const { data: householdTotals } = await supabase.rpc("get_household_category_totals", {
+      fam_id: familyId,
+      from_date: monthStart,
+      to_date: today,
+    });
+
+    const householdRows = householdTotals ?? [];
+    const householdIncome = householdRows.filter((r) => r.kind === "income").reduce((s, r) => s + r.total, 0);
+    const householdExpense = householdRows.filter((r) => r.kind === "expense").reduce((s, r) => s + r.total, 0);
+    const householdByCategory = householdRows
+      .filter((r) => r.kind === "expense")
+      .map((r) => ({ category: r.category_name ?? "Sin categoría", amount: -r.total }))
+      .sort((a, b) => a.amount - b.amount);
+
+    const { data: sharedGoals } = await supabase
+      .from("savings_goals")
+      .select("id, name, target_amount")
+      .eq("family_id", familyId)
+      .eq("is_shared", true);
+    const goalIds = (sharedGoals ?? []).map((g) => g.id);
+    const contributionsByGoal = new Map<string, number>();
+    if (goalIds.length > 0) {
+      const { data: contributions } = await supabase.from("savings_contributions").select("goal_id, amount").in("goal_id", goalIds);
+      for (const c of contributions ?? []) contributionsByGoal.set(c.goal_id, (contributionsByGoal.get(c.goal_id) ?? 0) + c.amount);
+    }
+
+    return (
+      <div className="mx-auto max-w-6xl space-y-4 px-4 py-5 sm:space-y-6 sm:px-6 sm:py-8">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Familia</h1>
+          <DashboardTabs active="familia" />
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-3 sm:gap-6">
+          <Card className="sm:col-span-2">
+            <div className="mb-4 flex items-center gap-2">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-accent text-accent-ink">
+                <UsersIcon className="h-4 w-4" />
+              </span>
+              <span className="text-sm text-ink-muted">Compartido este mes</span>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs text-ink-muted">Ingresos</p>
+                <p className="tabular text-2xl font-bold text-positive">{formatMXN(householdIncome)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-ink-muted">Gastos</p>
+                <p className="tabular text-2xl font-bold">{formatMXN(householdExpense)}</p>
+              </div>
+            </div>
+            <p className="mt-3 text-xs text-ink-muted">
+              Solo se muestran totales — nunca los movimientos individuales de otros miembros.
+            </p>
+          </Card>
+
+          <Card>
+            <span className="mb-3 block text-sm text-ink-muted">Gasto compartido por categoría</span>
+            {householdByCategory.length === 0 ? (
+              <p className="text-sm text-ink-secondary">Nadie ha compartido gastos este mes.</p>
+            ) : (
+              <CategorySummary transactions={householdByCategory} />
+            )}
+          </Card>
+        </div>
+
+        <Card>
+          <span className="mb-3 block text-sm text-ink-muted">Metas familiares</span>
+          {(sharedGoals ?? []).length === 0 ? (
+            <p className="text-sm text-ink-secondary">No hay metas de ahorro familiares todavía.</p>
+          ) : (
+            <div className="space-y-3">
+              {(sharedGoals ?? []).map((g) => {
+                const current = contributionsByGoal.get(g.id) ?? 0;
+                const target = g.target_amount ?? 0;
+                const pct = target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0;
+                return (
+                  <div key={g.id}>
+                    <div className="mb-1.5 flex items-center justify-between text-sm">
+                      <span className="font-medium">{g.name}</span>
+                      <span className="tabular text-ink-muted">
+                        {formatMXN(current)} / {formatMXN(target)}
+                      </span>
+                    </div>
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface">
+                      <div className="h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Card>
+      </div>
+    );
+  }
 
   const [{ data: cards }, { data: monthTxs }, { data: recentTxs }, { data: categories }, { data: goals }] = await Promise.all([
     supabase.from("cards").select("id, name, last4").eq("owner_id", user.id).order("created_at"),
@@ -110,7 +234,10 @@ export default async function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4 px-4 py-5 sm:space-y-6 sm:px-6 sm:py-8">
-      <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Hola, {displayName}</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Hola, {displayName}</h1>
+        <DashboardTabs active="personal" />
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-3 sm:gap-6">
         <Card>

@@ -9,7 +9,11 @@ import { tapScaleSmall } from "@/lib/motion";
 const inputClass = "w-full rounded-2xl border border-hairline bg-surface px-4 py-2.5 text-sm outline-none";
 
 export function AddCardForm() {
-  return <AddPanel label="Agregar">{(close) => <CardFields close={close} />}</AddPanel>;
+  return (
+    <AddPanel label="Agregar" title="Agregar tarjeta">
+      {(close) => <CardFields close={close} />}
+    </AddPanel>
+  );
 }
 
 function CardFields({ close }: { close: () => void }) {

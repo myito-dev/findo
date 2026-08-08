@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { TapButton } from "@/components/ui/TapButton";
+import { XIcon } from "@/components/icons";
 import { createClient } from "@/lib/supabase/client";
+import { addCategory, deleteCategory } from "@/lib/actions";
 
 interface FamilyInfo {
   id: string;
@@ -17,12 +19,19 @@ interface FamilyMemberRow {
   display_name: string;
 }
 
+interface CategoryRow {
+  id: string;
+  name: string;
+  kind: "income" | "expense";
+}
+
 export default function ConfiguracionPage() {
   const [supabase] = useState(() => createClient());
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
   const [family, setFamily] = useState<FamilyInfo | null>(null);
   const [members, setMembers] = useState<FamilyMemberRow[]>([]);
+  const [categories, setCategories] = useState<CategoryRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -30,6 +39,10 @@ export default function ConfiguracionPage() {
   const [creating, setCreating] = useState(false);
   const [inviteCode, setInviteCode] = useState("");
   const [joining, setJoining] = useState(false);
+
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [newCategoryKind, setNewCategoryKind] = useState<"expense" | "income">("expense");
+  const [addingCategory, setAddingCategory] = useState(false);
 
   const loadFamily = useCallback(
     async (uid: string) => {
@@ -54,6 +67,13 @@ export default function ConfiguracionPage() {
       } else {
         setMembers([]);
       }
+
+      const { data: categoryRows } = await supabase
+        .from("categories")
+        .select("id, name, kind")
+        .eq("family_id", membership.family_id)
+        .order("name");
+      setCategories(categoryRows ?? []);
     },
     [supabase]
   );
@@ -110,6 +130,27 @@ export default function ConfiguracionPage() {
     setJoining(false);
   }
 
+  async function handleAddCategory(e: React.FormEvent) {
+    e.preventDefault();
+    if (!userId || !newCategoryName.trim()) return;
+    setAddingCategory(true);
+
+    const formData = new FormData();
+    formData.set("name", newCategoryName.trim());
+    formData.set("kind", newCategoryKind);
+    await addCategory(formData);
+
+    await loadFamily(userId);
+    setNewCategoryName("");
+    setAddingCategory(false);
+  }
+
+  async function handleDeleteCategory(categoryId: string) {
+    if (!userId) return;
+    await deleteCategory(categoryId);
+    await loadFamily(userId);
+  }
+
   function copyInviteCode() {
     if (!family) return;
     navigator.clipboard.writeText(family.invite_code);
@@ -158,6 +199,72 @@ export default function ConfiguracionPage() {
                 </div>
               ))}
             </div>
+          </Card>
+
+          <Card>
+            <p className="mb-3 text-sm text-ink-muted">Categorías</p>
+            <div className="space-y-3">
+              <div>
+                <p className="mb-1.5 text-xs text-ink-muted">Gastos</p>
+                <div className="flex flex-wrap gap-2">
+                  {categories
+                    .filter((c) => c.kind === "expense")
+                    .map((c) => (
+                      <span key={c.id} className="pill flex items-center gap-1.5 bg-surface py-1.5 pl-3 pr-1.5 text-sm">
+                        {c.name}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteCategory(c.id)}
+                          aria-label={`Eliminar ${c.name}`}
+                          className="flex h-5 w-5 items-center justify-center rounded-full text-ink-muted hover:text-negative"
+                        >
+                          <XIcon className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))}
+                </div>
+              </div>
+              <div>
+                <p className="mb-1.5 text-xs text-ink-muted">Ingresos</p>
+                <div className="flex flex-wrap gap-2">
+                  {categories
+                    .filter((c) => c.kind === "income")
+                    .map((c) => (
+                      <span key={c.id} className="pill flex items-center gap-1.5 bg-surface py-1.5 pl-3 pr-1.5 text-sm">
+                        {c.name}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteCategory(c.id)}
+                          aria-label={`Eliminar ${c.name}`}
+                          className="flex h-5 w-5 items-center justify-center rounded-full text-ink-muted hover:text-negative"
+                        >
+                          <XIcon className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))}
+                </div>
+              </div>
+            </div>
+
+            <form onSubmit={handleAddCategory} className="mt-4 flex gap-2">
+              <select
+                value={newCategoryKind}
+                onChange={(e) => setNewCategoryKind(e.target.value as "expense" | "income")}
+                className="rounded-2xl border border-hairline bg-surface px-3 py-2.5 text-sm outline-none"
+              >
+                <option value="expense">Gasto</option>
+                <option value="income">Ingreso</option>
+              </select>
+              <input
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                placeholder="Nueva categoría"
+                className="flex-1 rounded-2xl border border-hairline bg-surface px-4 py-2.5 text-sm outline-none"
+              />
+              <TapButton type="submit" disabled={addingCategory} className="pill bg-accent px-4 py-2.5 text-sm font-semibold text-accent-ink">
+                Agregar
+              </TapButton>
+            </form>
           </Card>
         </>
       ) : (

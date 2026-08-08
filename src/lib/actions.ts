@@ -135,6 +135,32 @@ export async function signOut() {
   redirect("/login");
 }
 
+export async function addCategory(formData: FormData) {
+  const supabase = await createClient();
+  const { familyId } = await getUserAndFamily(supabase);
+  if (!familyId) throw new Error("No perteneces a una familia todavía.");
+
+  const kind = str(formData, "kind") === "income" ? "income" : "expense";
+
+  await supabase.from("categories").insert({
+    family_id: familyId,
+    name: str(formData, "name"),
+    kind,
+  });
+
+  revalidatePath("/configuracion");
+  revalidatePath("/movimientos");
+  revalidatePath("/");
+}
+
+export async function deleteCategory(categoryId: string) {
+  const supabase = await createClient();
+  await supabase.from("categories").delete().eq("id", categoryId);
+  revalidatePath("/configuracion");
+  revalidatePath("/movimientos");
+  revalidatePath("/");
+}
+
 export async function addContribution(formData: FormData) {
   const supabase = await createClient();
 

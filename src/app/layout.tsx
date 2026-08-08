@@ -9,6 +9,15 @@ export const metadata: Metadata = {
   title: "Findo",
   description: "Finanzas familiares — gastos, tarjetas y ahorros compartidos.",
   manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Findo",
+  },
+  icons: {
+    icon: "/icon-512.png",
+    apple: "/icon-192.png",
+  },
 };
 
 export const viewport: Viewport = {

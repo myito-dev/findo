@@ -20,7 +20,11 @@ interface CardOption {
 }
 
 export function AddTransactionForm({ categories, cards }: { categories: CategoryOption[]; cards: CardOption[] }) {
-  return <AddPanel label="Agregar">{(close) => <TransactionFields categories={categories} cards={cards} close={close} />}</AddPanel>;
+  return (
+    <AddPanel label="Agregar" title="Agregar movimiento">
+      {(close) => <TransactionFields categories={categories} cards={cards} close={close} />}
+    </AddPanel>
+  );
 }
 
 function TransactionFields({

@@ -186,6 +186,18 @@ body::before {
   border-radius: 999px;
 }
 
+/* iOS Safari auto-zooms the page on focusing any input/select/textarea with
+   a computed font-size under 16px, and (per iOS bug) stays zoomed in even
+   after the field blurs. Force 16px specifically on small viewports so the
+   normal text-sm sizing elsewhere is untouched on desktop. */
+@media (max-width: 640px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
 .tabular {
   font-variant-numeric: tabular-nums;
 }
