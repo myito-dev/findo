@@ -12,7 +12,7 @@ Finanzas familiares — cada quien ve las suyas, todos ven lo del hogar.
 
 ## Cómo arrancar
 
-1. **Instala dependencias** (yo no puedo correr `npm install` en este entorno, hazlo tú):
+1. **Instala dependencias**:
    ```
    npm install
    ```
